@@ -23,11 +23,11 @@ export async function main() {
   const response = await client.path("/chat/completions").post({
     body: {
       messages: [
-        { role:"system", content: "You are frontend developer who listens to user requirements and translates them into code." },
+        { role:"system", content: "You are general ai guru" },
         { role:"user", content: [
             {
                 type: 'text',
-                text: "Write HTML and CSS code for a web page based on the following hand-drawn sketch."
+                text: "What is currently happening in kenya?"
             },
             {
                 type: 'image_url',
