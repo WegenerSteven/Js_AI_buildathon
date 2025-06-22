@@ -8,7 +8,6 @@ import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-// import { AzureKeyCredential } from "@azure/core-auth";
 import { AzureChatOpenAI } from "@langchain/openai";
 
 // Load environment variables from .env file
@@ -25,12 +24,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../..");
 const pdfPath = path.join(projectRoot, "data/employee_handbook.pdf");
-
-//client initialization
-// const client = new ModelClient(
-//   process.env.AZURE_INFERENCE_SDK_ENDPOINT,
-//   new AzureKeyCredential(process.env.AZURE_INFERENCE_SDK_KEY)
-// );
 
 const chatModel = new AzureChatOpenAI({
   azureOpenAIApiKey: process.env.AZURE_INFERENCE_SDK_KEY,
