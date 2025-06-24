@@ -1,5 +1,4 @@
-
-# 🧠 Quest: I want to add conversation memory to my app
+# 🤖 Quest: I want to build an AI Agent
 
 > To reset your progress and select a different quest, click this button:
 >
@@ -13,235 +12,154 @@
 4. An Azure subscription. Use the [free trial](https://azure.microsoft.com/free/) if you don't have one, or [Azure for Students](https://azure.microsoft.com/free/students/) if you are a student.
 5. [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd?tabs=winget-windows%2Cbrew-mac%2Cscript-linux&pivots=os-windows) installed
 
+
 ## 📝 Overview
 
-In this step, you will learn you can simplify integrating AI features into your web applications using frameworks. [LangChain.js](https://js.langchain.com/docs/introduction/) is a framework for developing applications powered by language models. It provides a standard interface for working with different LLMs, tools, and data sources, making it easier to build complex applications.
+In this step, you will learn how to build a basic AI agent using the AI Foundry VS Code extension. An AI agent is a program powered by AI models that can understand instructions, make decisions, and perform tasks autonomously.
 
 ### Assumption ⚠️
 
-This step assumes you have already completed the previous steps in this project and have a working web application that uses Azure's LLM endpoints. If you haven't done so, please click the **Reset Progress** button above to select the _Add a simple chat interface_ quest.
+This step assumes you have already completed previous steps and that you have the Azure AI Foundry VS Code extension installed with a default project set up. If you haven't done so, please click the **Reset Progress** button above and start from the _Move AI prototype to Azure_ quest.
 
 > [!IMPORTANT]  
 > If you have done the previous quest, ensure you pull your changes from GitHub using `git pull` before continuing with this project to update the project README.
 
-## Step 1️⃣: Add LangChain.js to your project
-We'll first install LangChain.js in our project to ensure our backend can communicate with Azure's LLM endpoints using LangChain's abstractions.
-
-In your webapi directory, run
-
-```bash
-npm install langchain @langchain/openai
-```
-The current api code uses the Azure REST SDK directly. By switching to LangChain.js, we will decouple to code to take advantage of its abstractions and features like chains (composing tools and LLMs) and memory (storing conversation history).
-
-### Update imports
-
-Open `server.js` and replace:
-
-```javascript
-import { AzureKeyCredential } from "@azure/core-auth";
-import { isUnexpected } from "@azure-rest/ai-inference";
-``` 
-
-with:
-
-```javascript
-import { AzureChatOpenAI } from "@langchain/openai";
-```
-
-### Update client initialization
-Initialize LangChain's `AzureChatOpenAI` model client by replacing:
-
-```javascript
-const client = ModelClient(
-  process.env.AZURE_INFERENCE_SDK_ENDPOINT,
-  new AzureKeyCredential(process.env.AZURE_INFERENCE_SDK_KEY)
-);
-```
-
-with:
-
-```javascript
-const chatModel = new AzureChatOpenAI({
-  azureOpenAIApiKey: process.env.AZURE_INFERENCE_SDK_KEY,
-  azureOpenAIApiInstanceName: process.env.INSTANCE_NAME, // In target url: https://<INSTANCE_NAME>.services...
-  azureOpenAIApiDeploymentName: process.env.DEPLOYMENT_NAME, // i.e "gpt-4o"
-  azureOpenAIApiVersion: "2024-08-01-preview", // In target url: ...<VERSION>
-  temperature: 1,
-  maxTokens: 4096,
-});
-```
-
-> [!Note]
-> Update your `.env` with the missing variables 
-
-### Update chat endpoint
-
-Replace the Azure REST SDK api call logic in the try-catch block (_app.post("/chat")_) with the following code:
-
-```javascript
-  try {
-    const response = await chatModel.invoke(messages);
-    res.json({ reply: response.content });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Model call failed",
-      message: err.message,
-      reply: "Sorry, I encountered an error. Please try again."
-    });
-  }
-```
-
-### Test the integration
-
-Restart the server to confirm the changes are working. 
-
-## Step 2️⃣: Add conversation memory
-
-Currently, the chat model does not remember previous messages. For example, if you send a message like _"Hey, you can call me Terry. What should I call you?"_
-
-Then ask the model _"Quiz time. What's my name?"_. The model will not remember your name because your name is not passed to the model in the prompt.
-
-![Memory test](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/memory-test.png?raw=true)
-
-To add memory, you will use LangChain's built-in memory modules - `ChatMessageHistory` and `ConversationSummaryMemory`. Conversation memory allows the AI to reference previous exchanges in a session, enabling more context-aware and coherent responses and LangChain.js provides built-in memory modules that make this easy to implement. With LangChain, you can implement stateful AI app experiences without manually managing chat logs, and you can easily switch between in-memory, Redis, or other storage options.
+## Step 1️⃣: Create an Agent
 
 
-### How it would work in your app
+**‼️IMPORTANT NOTE**
 
-- Each user session (or conversation) maintains a history of messages.
-- When a user sends a new message, the backend includes previous exchanges from that session in the prompt.
-- The AI can reference earlier questions and answers, making the chat feel more natural and intelligent.
+Currently, agents are only supported in the following regions: **australiaeast, centraluseuap, eastus, eastus2, francecentral, japaneast, norwayeast, southindia, swedencentral, uksouth, westus, westus3**
 
-### Update imports
+At a later stage, you will add **bing grounding** to your agent, a service that works with **all Azure OpenAI models except _gpt-4o-mini, 2024-07-18_**. We therefore recommend using the _gpt-4o_ model for this quest.
 
-Add the following imports to the top of your `server.js` file:
+If you used a different region, please [create a new Azure AI Foundry project](https://ai.azure.com/build), _(On the AI Foundry portal)_, in one of the supported regions and deploy a model, (gpt-4o), there.
 
-```javascript
-import { BufferMemory } from "langchain/memory";
-import { ChatMessageHistory } from "langchain/stores/message/in_memory";
-```
+**‼️END OF NOTE**
 
-### Set up session-based in-memory store
+1.  **Update your working directory** 
 
-Store session histories, allowing you to maintain separate chat histories for different users or sessions.
+    Create a new folder called `agent` in the `packages` directory of your project. This folder will contain the configuration files for your agent.
 
-```javascript
-const sessionMemories = {};
-```
+2.  **Create & configure an Agent** 
 
-### Add a helper function to get/create a session history
+    Click on the AI Foundry icon in the Activity Bar. Under resources, ensure your default AI Foundry project is selected. Hover over the "Agents" section title and click the "+" (Create Agent) icon that appears.
 
-This utility function will check if a session history already exists for a given session ID. If it doesn't, it will create a new one.
+    ![Create Agent Button](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/create-agent.png?raw=true)
 
-```javascript
-function getSessionMemory(sessionId) {
-  if (!sessionMemories[sessionId]) {
-    const history = new ChatMessageHistory();
-    sessionMemories[sessionId] = new BufferMemory({
-      chatHistory: history,
-      returnMessages: true,
-      memoryKey: "chat_history",
-    });
-  }
-  return sessionMemories[sessionId];
-}
+    You'll be prompted to save the agent's configuration file. Assign the name `my-agent.agent.yaml` and save the file in the agents folder you created earlier. Once saved, the yaml file and the Agent Designer will open for you to configure your agent.
+    
+    On the Agent Designer, 
+    - Give your agent a name. i.e `my-agent` 
+    - Enter a foundation model for your agent from your model list. This model will power the agent's core reasoning and language capabilities. _Example. gpt-4o_
+    - System instructions for your agent. This tells the agent how it should behave. Enter the following:
+
+      ```
+      You are a helpful agent who loves emojis 😊. Be friendly and concise in your responses.
+      ```
+    - Parameters, i.e _temparature: 0.7_ 
+
+    The yaml configuration file should look like this:
+    
+      ````yaml
+      version: 1.0.0
+      name: my-agent
+      description: Description of the agent
+      id: ''
+      model:
+        id: gpt-4o
+        options:
+          temperature: 0.7
+          top_p: 1
+      instructions: >-
+        You are a helpful agent who loves emojis 😊. Be friendly and concise in your
+        responses.
+      tools: [] # We'll add tools later
+      ````
+3.  **Deploy Agent** 
+
+    Click on the **Deploy to Azure AI Foundry** button in the Agent Designer to deploy your agent to Azure AI Foundry Once created, the agent will pop up in the AI Foundry extension under the "Agents" section.
+
+    ![Deploy to Azure AI Foundry Button](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/deploy-to-ai-foundry.png?raw=true)
+
+## Step 2️⃣: Test the Agent in the Playground
+
+Now that you've created and deployed your agent, you can test it in the Playground - an interface that allows you to interact with your agent and see how it responds to different inputs.
+
+1.  **Open the Playground** 
+
+    Right-click on the agent you just created in the "Agents" section and select **Open Playground**. Alternatively, you can expand the "Tools" section and click on "Agent Playground", then select your agent from the list.
+
+    ![Agent Playground in tools](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/agent-playground-in-tools.png?raw=true)
+
+2.  **Test the Agent** 
+
+    In the Playground, you can start chatting with your agent. Try sending it a few messages to see how it responds. For example:
+    - "Hi there!" 
+    - Expect a friendly response with emojis 😎.
+
+      ![Agent Playground](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/agent-playground.png?raw=true)
+
+    - Then, try a prompt like _"What's the weather in Nairobi right now?"_
+    - Expect a response like "I can't check live weather, but you can check a weather website for the latest updates! 🌤️"
+
+      ![Agent Playground - weather response](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/agent-weather-response.png?raw=true)
+
+The agent currently has limitations including not being able to access real-time information or perform specific tasks. It can only respond based on the instructions and the model's knowledge.
+
+So in the next step, we will add a tool to the agent to make it more useful.
+
+## Step 3️⃣: Add a Tool to the Agent
+
+Tools calling is a powerful feature that allows your agent to perform specific tasks or access external data. In this step, we will add a tool to our agent that can use Bing Search to fetch real-time information. This will enable the agent to provide more accurate and up-to-date responses.
+
+### Create a Bing Search resource
+
+1. On the Azure portal, [create a bing resource](https://portal.azure.com/#create/Microsoft.BingGroundingSearch) (Grounding with Bing Search). Follow the prompts to create the resource. 
+
+2. Open the [AI Foundry portal](https://ai.azure.com/), navigate to the left navigation menu towards the bottom, select Management center.
+
+    ![Management Center](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/management-center.png?raw=true)
+
+3. In the **Connected resources** section, select **+ New connection**.
+
+4. In the Add a connection to external assets window, scroll to the **Knowledge section** and select **Grounding with Bing Search**.
+
+5. In the Connect a Grounding with Bing Search Account window, select **Add connection** next to your Grounding with Bing resource.
+
+    ![Add connection](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/add-connection.png?raw=true)
+
+6. Once connected, click **close**
+
+### Prepare the Bing Grounding tool YAML
+
+Back on Visual Studio Code, create a tool configuration .yaml file called `bing.yaml` in the same directory as your agent configuration file (the agent folder). Paste in the following into the `bing.yaml` file:
+
+```yaml
+type: bing_grounding
+id: bing_search
+options:
+  tool_connections:
+    - /subscriptions/<subscription_ID>/resourceGroups/<resource_group_name>/providers/Microsoft.MachineLearningServices/workspaces/<project_name>/connections/<bing_grounding_connection_name>
 ```
 
-### Update the chat endpoint
+  Replace the placeholders in the connection string under the tool_connections section with your information:
 
-Lastly, you'll update the /chat handler to fetch session memory and load the chat history. Before sending the prompt to the model, the chat history will be added to the messages array so that the AI has context when generating the next reply. You then save the latest user message and model response to the session memory.
+  - `subscription_ID` = Your Azure Subscription ID
+  - `resource_group_name` = Your Resource Group name
+  - `project_name` = Your Project name on AI Foundry
+  - `bing_grounding_connection_name` = The connection name **NOT** the bing resource name
 
-```javascript
-app.post("/chat", async (req, res) => {
-  const userMessage = req.body.message;
-  const useRAG = req.body.useRAG === undefined ? true : req.body.useRAG;
-  const sessionId = req.body.sessionId || "default";
+Save the `bing.yaml` file.
 
-  let sources = [];
+On the Agent Designer, click on the + icon next to the "Tools" section. This will prompt you to select a yaml file for the tool. Select the `bing.yaml` file you created earlier. Click on **Update Agent on Azure AI Foundry** to update your agent with the new tool to Azure AI Foundry.
 
-  const memory = getSessionMemory(sessionId);
-  const memoryVars = await memory.loadMemoryVariables({});
+![Add bing tool via extension](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/update-tool.png?raw=true)
 
-  if (useRAG) {
-    await loadPDF();
-    sources = retrieveRelevantContent(userMessage);
-  }
+Now that we have added the Bing Search API tool to our agent, we can test it in the Playground. Open the "Agent Playground" and send the agent a message like _"What's the weather in Nairobi right now?"_ The agent should use the Bing Search API tool to fetch the current weather information and respond with a friendly message.
 
-  // Prepare system prompt
-  const systemMessage = useRAG
-    ? {
-        role: "system",
-        content: sources.length > 0
-          ? `You are a helpful assistant for Contoso Electronics. You must ONLY use the information provided below to answer.\n\n--- EMPLOYEE HANDBOOK EXCERPTS ---\n${sources.join('\n\n')}\n--- END OF EXCERPTS ---`
-          : `You are a helpful assistant for Contoso Electronics. The excerpts do not contain relevant information for this question. Reply politely: \"I'm sorry, I don't know. The employee handbook does not contain information about that.\"`,
-      }
-    : {
-        role: "system",
-        content: "You are a helpful and knowledgeable assistant. Answer the user's questions concisely and informatively.",
-      };
+![Weather with Bing](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/weather-with-bing.png?raw=true)
 
-  try {
-    // Build final messages array
-    const messages = [
-      systemMessage,
-      ...(memoryVars.chat_history || []),
-      { role: "user", content: userMessage },
-    ];
-
-    const response = await chatModel.invoke(messages);
-
-    await memory.saveContext({ input: userMessage }, { output: response.content });
-
-    res.json({ reply: response.content, sources });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Model call failed",
-      message: err.message,
-      reply: "Sorry, I encountered an error. Please try again."
-    });
-  }
-});
-```
-
-To test this, open the chat UI in your browser and send a message like _"Hey, you can call me Terry. What should I call you?"_ and then ask _"Quiz time. What's my name?"_. The model should remember your name.
-
-  ![Memory test passed](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/memory-test-passed.png?raw=true)
-
-## ✅ Activity: Push your updated code to the repository
-
-### Quest Checklist
-
-To complete this quest and **AUTOMATICALLY UPDATE** your progress, you MUST push your code to the repository as described below.
-
-**Checklist**
-
-- [ ] Have a `@langchain/azure-openai` dependency in your package.json in the webapi directory
-
-1. In the terminal, run the following commands to add, commit, and push your changes to the repository:
-
-    ```bash
-    git add .
-    git commit -m "Updated to use LangChain.js and added conversation memory"
-    git push
-    ```
-
-2.  After pushing your changes, **WAIT ABOUT 15 SECONDS FOR GITHUB ACTIONS TO UPDATE YOUR README**.
-
-> To skip this quest and select a different one, click this button:
->
-> [![Skip to another quest](https://img.shields.io/badge/Skip--to--another--quest-ff3860?logo=mattermost)](../../issues/new?title=Skip+quest&labels=reset-quest&body=🔄+I+want+to+reset+my+AI+learning+quest+and+start+from+the+beginning.%0A%0A**Please+wait+about+15+seconds.+Your+progress+will+be+reset,+this+issue+will+automatically+close,+and+you+will+be+taken+back+to+the+Welcome+step+to+select+a+new+quest.**)
-
-## 📚 Further Reading
-
-Here are some additional resources to help you learn more about LangChain.js and its features:
-- [Get started with Serverless AI Chat with RAG using LangChain.js](https://github.com/Azure-Samples/serverless-chat-langchainjs)
-- [LangChain.js x Microsoft docs](https://js.langchain.com/docs/integrations/platforms/microsoft/)
-- [Ask YouTube: LangChain.js + Azure Quickstart](https://github.com/Azure-Samples/langchainjs-quickstart-demo)
-- [LangChain.js + Azure: A Generative AI App Journey](https://techcommunity.microsoft.com/blog/educatordeveloperblog/langchain-js--azure-a-generative-ai-app-journey/4101258)
-- [LangChain.js docs](https://js.langchain.com/docs/introduction/)
 
 <!-- ## Step 4️⃣: Agent playground to Code
 
