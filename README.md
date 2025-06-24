@@ -1,5 +1,4 @@
 
-
 # 🧠 Quest: I want to add conversation memory to my app
 
 > To reset your progress and select a different quest, click this button:
@@ -244,4 +243,339 @@ Here are some additional resources to help you learn more about LangChain.js and
 - [LangChain.js + Azure: A Generative AI App Journey](https://techcommunity.microsoft.com/blog/educatordeveloperblog/langchain-js--azure-a-generative-ai-app-journey/4101258)
 - [LangChain.js docs](https://js.langchain.com/docs/introduction/)
 
+<!-- ## Step 4️⃣: Agent playground to Code
 
+The Agent Playground is a great way to test your agent's capabilities, but it's not the only way to interact with it. In this step, we will update our application to use the agent we just created. This will allow us to use the agent in our application and make it more useful.
+
+### Get Agent code
+Open the **Agent Playground** on the [AI Foundry portal](https://ai.azure.com/) and click on **View Code**. This will show you the code that is used to interact with the agent. 
+
+![View code](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/view-code.png?raw=true)
+
+Switch to the **JavaScript** tab, copy and paste the code into a new file called `agent.js` in the `packages/webapi` directory of your project. The code will already have the necessary setup for the agent, and will retrieve and display the current thread.
+
+Run the code using `node agent.js` and you should see the output in the terminal.
+
+To send a message to the agent, you can update the `client.agents.createMessage` method to include the message you want to send. For example, you can replace the content with "When is the current weather in Cairo?" and run the code again. You should see the agent's response in the terminal.
+
+````javascript
+const message = await client.agents.createMessage(thread.id, {
+  role: "user",
+  content: "When is the current weather in Cairo?",
+});
+console.log(`Created message, message ID: ${message.id}`);
+````
+
+**Security Note 🔐**
+ 
+The code you copied from the Playground contains your Azure credentials (connection string). Make sure to keep this information secure and do not share it with anyone. You can use environment variables or a secrets manager to store sensitive information securely.
+
+### Create an AgentService Module
+
+To implement Agent mode in your current application, you will create a new module called `agentService.js` in the `packages/webapi` directory that will encapsulate the agent functionality. This module will handle the interaction with the agent and provide methods to send messages and receive responses.
+
+
+<details> <summary>Click to expand the `agentService.js` code</summary>
+
+```javascript
+import { AIProjectsClient } from "@azure/ai-projects";
+import { DefaultAzureCredential } from "@azure/identity";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const agentThreads = {};
+
+export class AgentService {
+  constructor() {
+    this.client = AIProjectsClient.fromConnectionString(
+      "<YOUR_CONNECTION_STRING>",
+      new DefaultAzureCredential()
+    );
+    
+    // The agent ID from your agent.yaml file
+    this.agentId = "<YOUR_AGENT_ID>";
+  }
+
+  async getOrCreateThread(sessionId) {
+    if (!agentThreads[sessionId]) {
+      const thread = await this.client.agents.createThread();
+      agentThreads[sessionId] = thread.id;
+      return thread.id;
+    }
+    return agentThreads[sessionId];
+  }
+
+  async processMessage(sessionId, message) {
+    try {
+      const threadId = await this.getOrCreateThread(sessionId);
+
+      const createdMessage = await this.client.agents.createMessage(threadId, {
+        role: "user",
+        content: message,
+      });
+
+      let run = await this.client.agents.createRun(threadId, this.agentId);
+      
+      while (run.status === "queued" || run.status === "in_progress") {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        run = await this.client.agents.getRun(threadId, run.id);
+      }
+      
+      if (run.status !== "completed") {
+        console.error(`Run failed with status: ${run.status}`);
+        return {
+          reply: `Sorry, I encountered an error (${run.status}). Please try again.`,
+        };
+      }
+      
+      const messages = await this.client.agents.listMessages(threadId);
+      
+      const assistantMessages = messages.data
+        .filter(msg => msg.role === "assistant")
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      if (assistantMessages.length === 0) {
+        return { 
+          reply: "I don't have a response at this time. Please try again.",
+        };
+      }
+
+      let responseText = "";
+      for (const contentItem of assistantMessages[0].content) {
+        if (contentItem.type === "text") {
+          responseText += contentItem.text.value;
+        }
+      }
+      
+      return {
+        reply: responseText,
+      };
+    } catch (error) {
+      console.error("Agent error:", error);
+      return {
+        reply: "Sorry, I encountered an error processing your request. Please try again.",
+      };
+    }
+  }
+}
+```
+</details>
+
+### Update the server.js file
+
+Let's update the `server.js` file to use the new `AgentService` module. First, import the `AgentService` module at the top of the file
+
+```javascript
+import { AgentService } from "./agentService.js";
+```
+Right before the `app.post("/chat", ...)` route, create an instance of the `AgentService` class:
+
+```javascript
+const agentService = new AgentService();
+```
+
+Inside the `try` block of the `/chat` route before `let sources = []`, add the following code to extract the mode from the request body and route to the agent service if the mode is set to "agent":
+
+```javascript
+const mode = req.body.mode || "basic";
+
+// If agent mode is selected, route to agent service
+if (mode === "agent") {
+  const agentResponse = await agentService.processMessage(sessionId, userMessage);
+  return res.json({
+    reply: agentResponse.reply,
+    sources: []
+  });
+}
+```
+
+### Update Chat UI
+
+First, modify the ChatInterface class in `webapp/src/components/chat.js` Add a new property for mode (basic vs agent) 
+
+```javascript
+chatMode: { type: String } // Add new property for mode
+```
+
+In the constructor, set the default mode to "basic":
+
+```javascript
+this.chatMode = "basic"; // Set default mode to basic
+```
+
+In the render method, between the `Clear Chat button` and the `RAG-toggle component`, add a model-selector component. 
+
+```javascript
+  <div class="mode-selector">
+    <label>Mode:</label>
+      <select @change=${this._handleModeChange}>
+        <option value="basic" ?selected=${this.chatMode === 'basic'}>Basic AI</option>
+        <option value="agent" ?selected=${this.chatMode === 'agent'}>Agent</option>
+      </select>
+  </div>
+```
+
+![Switch modes](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/switch-modes.png?raw=true)
+
+Update the `RAG toggle` to be disabled when the mode is set to "agent". 
+
+
+```javascript
+  <label class="rag-toggle ${this.chatMode === 'agent' ? 'disabled' : ''}">
+    <input type="checkbox" 
+      ?checked=${this.ragEnabled} 
+      @change=${this._toggleRag}
+      ?disabled=${this.chatMode === 'agent'}>
+  Use Employee Handbook
+</label>
+```
+
+![Disable RAG toggle in Agent mode](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/disable-rag-toggle.png?raw=true)
+
+Let's make the placeholder text conditional based on the selected mode
+
+```javascript
+  <input 
+    type="text" 
+    placeholder=${this.chatMode === 'basic' ? 
+      "Ask about company policies, benefits, etc..." : 
+      "Ask Agent"}
+    .value=${this.inputMessage}
+    @input=${this._handleInput}
+    @keyup=${this._handleKeyUp}
+  />
+```
+
+![Agent mode placeholder text](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/ask-agent.png?raw=true)
+
+and the message sender display to show 'Agent' instead of 'AI' when the mode is set to 'agent':
+
+```javascript
+<span class="message-sender">${message.role === 'user' ? 'You' : (this.chatMode === 'agent' ? 'Agent' : 'AI')}</span>
+```
+
+![Agent mode placeholder](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/agent.png?raw=true)
+
+Add a new method `_handleModeChange` to handle the mode change event after the render method:
+
+```javascript
+_handleModeChange(e) {
+  const newMode = e.target.value;
+  if (newMode !== this.chatMode) {
+    this.chatMode = newMode;
+    
+    // Disable RAG when switching to agent mode
+    if (newMode === 'agent') {
+      this.ragEnabled = false;
+    }
+    
+    clearMessages();
+    this.messages = [];
+  }
+}
+```
+
+Update the `_apiCall` method to send the selected mode to the server:
+
+```javascript
+async _apiCall(message) {
+  const res = await fetch("http://localhost:3001/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ 
+      message,
+      useRAG: this.ragEnabled,
+      mode: this.chatMode // Send the selected mode to the server
+    }),
+  });
+  const data = await res.json();
+  return data;
+}
+```
+
+Let's improve the styling of the mode selector. Add the following CSS to `webapp/src/components/chat.css` after `.rag-toggle` styles:
+
+```css
+.mode-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  background: rgba(50,50,50,0.5);
+  padding: 6px 12px;
+  border-radius: 18px;
+  margin-right: auto;
+}
+
+.mode-selector label {
+  color: #e0e0e0;
+  white-space: nowrap;
+}
+
+.mode-selector select {
+  background: #18191a;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.mode-selector select:focus {
+  border-color: #1e90ff;
+}
+
+.rag-toggle.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rag-toggle.disabled input[type="checkbox"] {
+  cursor: not-allowed;
+}
+```
+
+### Test Agent Mode in the app
+
+In the terminal, navigate to the `packages/webapi` directory and run `npm start` to start the server. In another terminal, navigate to the `packages/webapp` directory and run `npm run dev` to start the web application. 
+
+On the app, select the **Agent** mode from the dropdown. Type a message in the input box and hit enter. The agent should respond with a friendly message.
+
+If you ask the agent a question that requires real-time information, such as _"What's the current weather in Spain?"_, the agent should ground its response using the Bing Search API and provide you with the latest information.
+
+![Weather in Spain in Agent mode](https://github.com/Azure-Samples/JS-AI-Build-a-thon/blob/assets/jsai-buildathon-assets/weather-in-spain.png?raw=true) -->
+
+
+## ✅ Activity: Push your updated code to the repository - TBD
+
+### Quest Checklist
+
+To complete this quest and **AUTOMATICALLY UPDATE** your progress, you MUST push your code to the repository as described below.
+
+**Checklist**
+
+- [ ] Have a `agent` folder in the packages directory
+
+1. In the terminal, run the following commands to add, commit, and push your changes to the repository:
+
+    ```bash
+    git add .
+    git commit -m "Added agent"
+    git push
+    ```
+2.  After pushing your changes, **WAIT ABOUT 15 SECONDS FOR GITHUB ACTIONS TO UPDATE YOUR README**.
+
+> To skip this quest and select a different one, click this button:
+>
+> [![Skip to another quest](https://img.shields.io/badge/Skip--to--another--quest-ff3860?logo=mattermost)](../../issues/new?title=Skip+quest&labels=reset-quest&body=🔄+I+want+to+reset+my+AI+learning+quest+and+start+from+the+beginning.%0A%0A**Please+wait+about+15+seconds.+Your+progress+will+be+reset,+this+issue+will+automatically+close,+and+you+will+be+taken+back+to+the+Welcome+step+to+select+a+new+quest.**)
+
+## 📚 Further Reading
+
+Here are some additional resources to help you learn more about building AI agents and extending their capabilities with tools:
+- [Azure AI Agents JavaScript examples](https://github.com/Azure-Samples/azure-ai-agents-javascript)
+- [Your First AI Agent in JS with Azure AI Agent Service](https://www.youtube.com/live/RNphlRKvmJQ?si=I3rUp-LmnvS008ym)
+- [Build Apps and Agents with Visual Studio Code and Azure blog](https://devblogs.microsoft.com/blog/build-apps-and-agents-with-visual-studio-code-and-azure)
+- [📹 DEMFP781: From Prompt to Product: Build an AI Agent That Generates UI](https://build.microsoft.com/en-US/sessions/DEMFP781?source=sessions)
+- [Build with the AI Foundry JavaScript SDK](https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/develop/sdk-overview?pivots=programming-language-javascript)
