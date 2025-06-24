@@ -1,5 +1,5 @@
 import { BufferMemory } from "langchain/memory";
-import { ChatMessageHistory } from "langchain/stores/message/in_memory";
+import { ChatMessageHistory } from "langchain/memory";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -112,7 +112,6 @@ app.post("/chat", async (req, res) => {
   const useRAG = req.body.useRAG === undefined ? true : req.body.useRAG;
   const sessionId = req.body.sessionId || "default"; // Use a session ID or default to "default"
 
-  let messages = [];
   let sources = [];
 
   const memory = getSessionMemory(sessionId);
