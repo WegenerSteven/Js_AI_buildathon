@@ -1,7 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as os from "os";
-import { isErrored } from "stream";
-import { z } from "zod";
+
 
 // Create server instance
 const server = new McpServer({
@@ -86,40 +85,5 @@ server.tool(
     isError: false
   })
 );
-/*server.tool(
-  "get_weather",
-  "Get weather for a location",
-  {
-    location: z.string().describe("Location to get weather for, e.g., city name, state, or coordinates"),
-  },
-  async ({ location }) => {
-    if (!location) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "Location is required.",
-          },
-        ],
-      };
-    }
-
-    // mock weather data
-    const conditions = [ "Sunny", "Rainy", "Cloudy", "Snowy" ];
-    const weather = {
-      location: location,
-      temperature: `${Math.floor(Math.random() * 80) + 10}°F`,
-      condition: conditions[Math.floor(Math.random() * conditions.length)],
-    }
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(weather),
-        },
-      ],
-    };
-  }
-);*/
 
 export { server };
