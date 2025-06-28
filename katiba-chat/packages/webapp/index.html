@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="JuaKatiba - AI Assistant for Kenyan Constitution and Laws" />
+    <link rel="icon" type="image/svg+xml" href="assets/kenya-flag.ico" />
+    <link rel="stylesheet" href="/assets/kenya-theme.css" />
+    <title>JuaKatiba - Kenyan Constitution Assistant</title>
+    <style>
+      :root {
+        --azc-primary: #006633; /* Kenya flag green */
+        --azc-secondary: #dc143c; /* Kenya flag red */
+        --azc-accent: #ffd700; /* Golden yellow accent */
+        --azc-bg: #f8f9fa;
+        --azc-border-radius: 12px;
+        --azc-shadow: 0 2px 8px rgba(0, 102, 51, 0.1);
+      }
+      html,
+      body {
+        font-size: 16px;
+        margin: 0;
+        background: var(--azc-bg);
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 61, 0.03) 0%,
+          /* Kenya green */ rgba(206, 17, 38, 0.02) 25%,
+          /* Kenya red */ rgba(255, 255, 255, 0.05) 50%,
+          /* White */ rgba(206, 17, 38, 0.02) 75%,
+          /* Kenya red */ rgba(0, 0, 0, 0.01) 100% /* Black */
+        );
+        background-attachment: fixed;
+      }
+      nav {
+        display: flex;
+        flex: 0 1 auto;
+        background: linear-gradient(135deg, var(--azc-primary) 0%, #004d26 100%);
+        color: #fff;
+        padding: 16px 24px;
+        font-family:
+          'Segoe UI',
+          -apple-system,
+          BlinkMacSystemFont,
+          Roboto,
+          'Helvetica Neue',
+          sans-serif;
+        font-size: 1.3rem;
+        font-weight: 600;
+        align-items: center;
+        box-shadow: var(--azc-shadow);
+        border-bottom: 3px solid var(--azc-secondary);
+
+        & img {
+          height: 36px;
+          margin-right: 0.75em;
+          filter: brightness(1.1);
+        }
+      }
+      main {
+        container-type: size;
+        flex: 1;
+        position: relative;
+        display: flex;
+        background-image:
+          radial-gradient(circle at 85% 15%, rgba(0, 122, 61, 0.06) 0%, transparent 40%),
+          radial-gradient(circle at 15% 85%, rgba(206, 17, 38, 0.04) 0%, transparent 40%);
+      }
+      azc-chat {
+        flex: 1;
+        max-width: 1024px;
+        margin: 0 auto;
+        z-index: 1;
+        position: relative;
+        background-image: url('assets/flag-map.png');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+      }
+
+      azc-chat::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(248, 249, 250, 0.85); /* Semi-transparent overlay */
+        backdrop-filter: blur(1px);
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      azc-history {
+        position: relative;
+        background-image: url('assets/flag-map.png');
+        background-size: cover;
+        background-position: center left;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+      }
+
+      azc-history::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(248, 249, 250, 0.9); /* More faded for sidebar */
+        backdrop-filter: blur(2px);
+        z-index: -1;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <img src="assets/kenya-flag-icon.ico" alt="Kenyan Flag" style="height: 40px; width: 55px; margin-right: 0.75em" />
+      JuaKatiba - Kenyan Constitution Assistant
+    </nav>
+    <main>
+      <azc-history id="chatHistory"></azc-history>
+      <azc-chat id="chat"></azc-chat>
+    </main>
+    <script type="module" src="/src/index.ts"></script>
+    <script>
+      // Generate a unique ID and store it in local storage
+      const userId = localStorage.getItem('userId') || crypto.randomUUID();
+      localStorage.setItem('userId', userId);
+
+      window.chatHistory.userId = userId;
+      window.chatHistory.addEventListener('loadSession', (e) => {
+        const { id, messages } = e.detail;
+        window.chat.sessionId = id;
+        window.chat.messages = messages;
+      });
+
+      window.chat.userId = userId;
+      window.chat.addEventListener('messagesUpdated', () => {
+        window.chatHistory.refresh();
+      });
+    </script>
+  </body>
+</html>

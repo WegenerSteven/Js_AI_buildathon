@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Constitutional scales of justice -->
+  <path d="M12 2L12 22"/>
+  <path d="M8 6L16 6"/>
+  <path d="M4 10C4 8 6 8 6 10L6 12C6 14 4 14 4 12Z"/>
+  <path d="M18 10C18 8 20 8 20 10L20 12C20 14 18 14 18 12Z"/>
+  <path d="M6 6L6 12"/>
+  <path d="M18 6L18 12"/>
+</svg>
